@@ -1,9 +1,9 @@
 #==========================================================================
-# Description: Build Armbian server image
+# Description: Build Armbian arm64 server image
 # Copyright (C) 2021 https://github.com/ophub/amlogic-s9xxx-armbian
 #==========================================================================
 
-name: Build Armbian server image
+name: Build Armbian arm64 server image
 
 on:
   repository_dispatch:
@@ -12,12 +12,11 @@ on:
       set_release:
         description: "Select OS Release."
         required: false
-        default: "bookworm"
+        default: "trixie"
         type: choice
         options:
           - trixie
           - bookworm
-          - bullseye
           - noble
           - jammy
       armbian_board:
@@ -27,14 +26,18 @@ on:
         type: choice
         options:
           - all
-          - top50
-          - rest50
-          - a311d-oes_s905d_s905x3_s922x-ct2000_wxy-oect
+          - first55
+          - from55
+          - last20
+          - a311d-oes_s922x-oes-plus_wxy-oect
+          - nsy-g16-plus_nsy-g68-plus_bdy-g18-pro
+          - s905d_s905x3_s912_s922x-ct2000
           - a311d
           - a311d-oes
           - alark35-3500
           - anas3035
           - aio-3399b
+          - bdy-g18-pro
           - beikeyun
           - chainedbox
           - crrc
@@ -49,7 +52,7 @@ on:
           - fine3399
           - firefly-rk3399
           - fmx1-pro
-          - jp-tvbox
+          - gzpeite-p01
           - h28k
           - h66k
           - h68k
@@ -60,6 +63,7 @@ on:
           - hs530r
           - hugsun-x99
           - ipc-r
+          - jp-tvbox
           - king3399
           - kylin3399
           - lckfb-tspi
@@ -69,6 +73,8 @@ on:
           - nanopc-t6
           - nanopi-r5c
           - nanopi-r5s
+          - nsy-g16-plus
+          - nsy-g68-plus
           - orangepi-5-plus
           - orangepi-5b
           - panther-x2
@@ -182,7 +188,7 @@ on:
           - vplus
           - wocyber-a3
           - wxy-oect
-          - wxy-oect-replaced
+          - wxy-oect-mod
           - xiaobao
           - yskj
           - zcube1-max
@@ -191,16 +197,15 @@ on:
       armbian_kernel:
         description: "Select kernel version."
         required: false
-        default: "5.15.y_6.1.y"
+        default: "6.1.y_6.12.y"
         type: choice
         options:
-          - 5.4.y
           - 5.10.y
           - 5.15.y
           - 6.1.y
           - 6.6.y
           - 6.12.y
-          - 5.4.y_5.10.y
+          - 5.10.y_5.15.y
           - 5.15.y_6.1.y
           - 6.1.y_6.12.y
           - 6.1.y_6.6.y
@@ -225,7 +230,6 @@ on:
         options:
           - stable
           - flippy
-          - dev
           - beta
       armbian_fstype:
         description: "Select armbian rootfs type."
@@ -235,14 +239,15 @@ on:
         options:
           - ext4
           - btrfs
-      armbian_storage:
-        description: "Select image storage type."
+      armbian_edition:
+        description: "Select image edition type."
         required: false
-        default: "save"
+        default: "server"
         type: choice
         options:
-          - save
-          - temp
+          - server
+          - desktop
+          - beta
       builder_name:
         description: "Set Armbian builder signature."
         required: false
@@ -263,7 +268,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Initialization environment
         id: init
@@ -277,7 +282,7 @@ jobs:
           sudo rm -f /swapfile /mnt/swapfile
           sudo -E apt-get -y update
           sudo -E apt-get -y purge azure-cli ghc* zulu* llvm* firefox google* dotnet* powershell openjdk* mongodb* moby* || true
-          sudo -E apt-get -y install $(curl -fsSL https://tinyurl.com/ubuntu2404-build-armbian)
+          sudo -E apt-get -y install $(curl -fsSL https://ophub.org/ubuntu2404-build-armbian-depends)
           sudo -E systemctl daemon-reload
           #sudo -E apt-get -y full-upgrade
           sudo -E apt-get -y autoremove --purge
@@ -303,11 +308,12 @@ jobs:
           sudo pvcreate /dev/loop7
           sudo vgcreate github /dev/loop6 /dev/loop7
           sudo lvcreate -n runner -l 100%FREE github
-          sudo mkfs.xfs /dev/github/runner
+          sudo mkfs.xfs -f -i sparse=0 -b size=4096 /dev/github/runner
           sudo mkdir -p /builder
           sudo mount /dev/github/runner /builder
-          sudo chown -R runner.runner /builder
+          sudo chown -R runner:runner /builder
           df -Th
+          echo "status=success" >> ${GITHUB_OUTPUT}
 
       - name: Download source code
         id: down
@@ -315,8 +321,8 @@ jobs:
         if: ${{ steps.init.outputs.status }} == 'success' && !cancelled()
         run: |
           df -hT ${PWD}
-          git clone --branch=v25.11 https://github.com/armbian/build.git build
-          ln -sf /builder/build ${GITHUB_WORKSPACE}/build
+          git clone -q --single-branch --depth=1 --branch=main https://github.com/armbian/build.git build
+          ln -sf /builder/build ${{ github.workspace }}/build
           ln -sf /builder/build /home/runner/work/_actions/ophub/amlogic-s9xxx-armbian/main/build
           echo "status=success" >> ${GITHUB_OUTPUT}
 
@@ -325,6 +331,8 @@ jobs:
         working-directory: /builder
         if: ${{ steps.down.outputs.status }} == 'success' && !cancelled()
         run: |
+          # Enable QEMU emulation for ARM architecture
+          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes 2>/dev/null || true
           # Compile method and parameter description: https://docs.armbian.com/Developer-Guide_Build-Options
           cd build/
               ./compile.sh RELEASE=${{ inputs.set_release }} BOARD=odroidn2 BRANCH=current BUILD_MINIMAL=no \
@@ -338,20 +346,25 @@ jobs:
         run: |
           # Organize and keep essential files, delete unnecessary files
           chmod +x ${ROOTFS_SCRIPT}
-          ${ROOTFS_SCRIPT} -v ${{ inputs.set_release }} -s true -c true -k true
+          ${ROOTFS_SCRIPT} -v ${{ inputs.set_release }} -s true -c true -k true -p arm64
+
+          # Clean build directory except output folder
+          cd build/
+          rm -rf $(ls . | grep -v "^output$" | xargs) 2>/dev/null
 
           # Output cleaning result information
           df -hT ${PWD}
-          echo "build_tag=Armbian_${{ inputs.set_release }}_${{ inputs.armbian_storage }}_$(date +"%Y.%m")" >> ${GITHUB_OUTPUT}
+          echo "build_tag=Armbian_${{ inputs.set_release }}_arm64_${{ inputs.armbian_edition }}_$(date +"%Y.%m")" >> ${GITHUB_ENV}
           echo "status=success" >> ${GITHUB_OUTPUT}
 
       - name: Upload Armbian image to Release
         uses: ncipollo/release-action@main
         if: ${{ steps.clean.outputs.status }} == 'success' && !cancelled()
         with:
-          tag: ${{ steps.clean.outputs.build_tag }}
+          tag: ${{ env.build_tag }}
           artifacts: build/output/images/*
           allowUpdates: true
+          makeLatest: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Rebuild Armbian
@@ -372,17 +385,19 @@ jobs:
         uses: ncipollo/release-action@main
         if: ${{ env.PACKAGED_STATUS }} == 'success' && !cancelled()
         with:
-          tag: ${{ steps.clean.outputs.build_tag }}
+          tag: ${{ env.build_tag }}
           artifacts: ${{ env.PACKAGED_OUTPUTPATH }}/*
           allowUpdates: true
           removeArtifacts: false
           replacesArtifacts: true
+          makeLatest: true
           token: ${{ secrets.GITHUB_TOKEN }}
           body: |
             ### Armbian Image information
-            - Default username: root
-            - Default password: 1234
-            - Install command: armbian-install
-            - Update command: armbian-update
-            ### Armbian Image Verification
-            - sha256sum
+            - Default username: `root`
+            - Default password: `1234`
+            - Install command: `armbian-install`
+            - Update command: `armbian-update`
+            ### Applicable platform
+            - 🐧 `arm64`
+            - 🐋 Docker image: https://hub.docker.com/u/ophub
