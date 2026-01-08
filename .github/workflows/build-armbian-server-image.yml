@@ -22,12 +22,12 @@ on:
       armbian_board:
         description: "Select device board."
         required: false
-        default: "s905l3-cm211"
+        default: "all"
         type: choice
         options:
           - all
-          - first55
-          - from55
+          - first50
+          - from50
           - last20
           - a311d-oes_s922x-oes-plus_wxy-oect
           - nsy-g16-plus_nsy-g68-plus_bdy-g18-pro
@@ -40,6 +40,7 @@ on:
           - bdy-g18-pro
           - beikeyun
           - chainedbox
+          - cm3588-nas
           - crrc
           - dc-a588
           - dg3399
@@ -69,6 +70,7 @@ on:
           - lckfb-tspi
           - leez
           - lx-r3s
+          - lz-k3568
           - mrkaio-m68s
           - nanopc-t6
           - nanopi-r5c
@@ -321,7 +323,7 @@ jobs:
         if: ${{ steps.init.outputs.status }} == 'success' && !cancelled()
         run: |
           df -hT ${PWD}
-          git clone -q --single-branch --depth=1 --branch=main https://github.com/armbian/build.git build
+          git clone --branch=v25.08 https://github.com/armbian/build.git build
           ln -sf /builder/build ${{ github.workspace }}/build
           ln -sf /builder/build /home/runner/work/_actions/ophub/amlogic-s9xxx-armbian/main/build
           echo "status=success" >> ${GITHUB_OUTPUT}
