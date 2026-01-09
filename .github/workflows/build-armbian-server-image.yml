@@ -323,7 +323,7 @@ jobs:
         if: ${{ steps.init.outputs.status }} == 'success' && !cancelled()
         run: |
           df -hT ${PWD}
-          git clone --branch=v25.08 https://github.com/armbian/build.git build
+          git clone --branch=v25.02 https://github.com/armbian/build.git build
           ln -sf /builder/build ${{ github.workspace }}/build
           ln -sf /builder/build /home/runner/work/_actions/ophub/amlogic-s9xxx-armbian/main/build
           echo "status=success" >> ${GITHUB_OUTPUT}
@@ -348,7 +348,7 @@ jobs:
         run: |
           # Organize and keep essential files, delete unnecessary files
           chmod +x ${ROOTFS_SCRIPT}
-          ${ROOTFS_SCRIPT} -v bookworm -s true -c true -k true
+          ${ROOTFS_SCRIPT} -v ${{ inputs.set_release }} -s true -c true -k true -p arm64
 
           # Clean build directory except output folder
           cd build/
