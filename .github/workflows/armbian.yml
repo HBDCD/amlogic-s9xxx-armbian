@@ -1,48 +1,49 @@
-name: Official
+name: Build Armbian OdroidN2 (Debian CLI)
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - "v*"
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-24.04
 
-    permissions:
-      contents: write
-
     steps:
-      - name: Checkout workflow repository
+      - name: Checkout current repo
         uses: actions/checkout@v4
+
+      - name: Set build date tag
+        id: tag
+        run: |
+          TAG=$(date +%Y%m%d)
+          echo "TAG=$TAG" >> $GITHUB_ENV
+
+      - name: Create and push git tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag -a "$TAG" -m "Automated build $TAG"
+          git push origin "$TAG"
 
       - name: Install build dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            git \
-            build-essential \
-            gcc-aarch64-linux-gnu \
-            libssl-dev \
-            bc \
-            bison \
-            flex \
-            libncurses5-dev \
-            libncursesw5-dev \
-            qemu-user-static \
-            debootstrap \
-            binfmt-support \
-            rsync \
-            curl \
-            xz-utils \
-            python3
+          sudo apt update
+          sudo apt install -y \
+            git curl wget xz-utils \
+            build-essential gcc g++ \
+            libncurses-dev flex bison \
+            libssl-dev bc rsync kmod \
+            ccache python3 python3-pip \
+            qemu-user-static debootstrap \
+            binfmt-support device-tree-compiler
 
-      - name: Clone Armbian build repository
+      - name: Clone Armbian build repo (main branch only)
         run: |
-          git clone --depth=1 https://github.com/armbian/build.git
+          git clone --depth=1 --branch=main https://github.com/armbian/build.git
 
-      - name: Build Armbian image (Odroid N2, Debian, Server)
+      - name: Build Armbian for Odroid N2 (Debian CLI)
         working-directory: build
         run: |
           ./compile.sh \
@@ -51,18 +52,12 @@ jobs:
             RELEASE=bookworm \
             BUILD_MINIMAL=yes \
             BUILD_DESKTOP=no \
-            KERNEL_CONFIGURE=no \
-            EXPERT=yes \
-            CLEAN_LEVEL=make
-
-      - name: Collect build artifacts
-        run: |
-          mkdir -p output
-          find build/output/images -type f -name "*.img.xz" -exec cp {} output/ \;
+            KERNEL_CONFIGURE=no
 
       - name: Upload image to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: output/*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ env.TAG }}
+          name: Armbian OdroidN2 Debian CLI ${{ env.TAG }}
+          files: |
+            build/output/images/*
