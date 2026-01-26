@@ -1,0 +1,68 @@
+name: Official
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout workflow repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            git \
+            build-essential \
+            gcc-aarch64-linux-gnu \
+            libssl-dev \
+            bc \
+            bison \
+            flex \
+            libncurses5-dev \
+            libncursesw5-dev \
+            qemu-user-static \
+            debootstrap \
+            binfmt-support \
+            rsync \
+            curl \
+            xz-utils \
+            python3
+
+      - name: Clone Armbian build repository
+        run: |
+          git clone --depth=1 https://github.com/armbian/build.git
+
+      - name: Build Armbian image (Odroid N2, Debian, Server)
+        working-directory: build
+        run: |
+          ./compile.sh \
+            BOARD=odroidn2 \
+            BRANCH=current \
+            RELEASE=bookworm \
+            BUILD_MINIMAL=yes \
+            BUILD_DESKTOP=no \
+            KERNEL_CONFIGURE=no \
+            EXPERT=yes \
+            CLEAN_LEVEL=make
+
+      - name: Collect build artifacts
+        run: |
+          mkdir -p output
+          find build/output/images -type f -name "*.img.xz" -exec cp {} output/ \;
+
+      - name: Upload image to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: output/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
