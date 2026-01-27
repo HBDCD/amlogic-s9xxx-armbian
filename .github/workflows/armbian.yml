@@ -14,14 +14,21 @@ jobs:
       - name: Checkout current repo
         uses: actions/checkout@v4
 
-      # ===== 每次运行都生成唯一 tag =====
+      # 1. 释放磁盘空间 (解决编译大镜像空间不足的隐患)
+      - name: Free Disk Space
+        run: |
+          sudo docker image prune -a -f
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/boost
+          sudo rm -rf /etc/apt/sources.list.d/*
+
+      # 2. 生成版本标签
       - name: Set unique build tag
         run: |
-          # 使用日期 + GitHub Actions 内置 run number 保证唯一
           TAG=$(date +%Y%m%d)-${GITHUB_RUN_NUMBER}
           echo "TAG=$TAG" >> $GITHUB_ENV
           echo "Using tag: $TAG"
 
+      # 3. 推送 Git Tag
       - name: Create and push git tag
         run: |
           git config user.name "github-actions"
@@ -29,6 +36,7 @@ jobs:
           git tag -a "$TAG" -m "Automated build $TAG"
           git push origin "$TAG"
 
+      # 4. 安装 Armbian 编译必需的依赖
       - name: Install build dependencies
         run: |
           sudo apt update
@@ -41,14 +49,16 @@ jobs:
             qemu-user-static debootstrap \
             binfmt-support device-tree-compiler
 
-      - name: Clone Armbian build repo (main branch only)
+      # 5. 克隆 Armbian 源码
+      - name: Clone Armbian build repo
         run: |
           git clone --depth=1 --branch=v25.05 https://github.com/armbian/build.git
 
+      # 6. 执行编译 (Odroid N2)
       - name: Build Armbian for Odroid N2 (Debian CLI)
         working-directory: build
         run: |
-          ./compile.sh \
+          sudo ./compile.sh \
             BOARD=odroidn2 \
             BRANCH=current \
             RELEASE=bookworm \
@@ -56,26 +66,24 @@ jobs:
             BUILD_DESKTOP=no \
             KERNEL_CONFIGURE=no
 
-      # ===== 仅压缩镜像，不生成校验 =====
-# ===== 仅压缩镜像，不生成校验 =====
+      # 7. 安全压缩镜像 (修复了之前的 xz 参数错误和权限问题)
       - name: Compress image
         working-directory: build/output/images
         run: |
           set -e
+          shopt -s nullglob
           for img in *.img; do
             echo "Compressing $img ..."
-            # 1. 使用 sudo 确保能读取 root 权限生成的镜像
-            # 2. 使用 -c 将压缩流导向新文件，避免 xz 尝试删除原文件时权限不足
-            # 3. 这样写比直接 xz $img 更稳妥
+            # 使用 sudo 配合重定向，彻底解决权限和 unrecognized option 报错
             sudo sh -c "xz -c -T0 -6 '$img' > '${img}.xz'"
-            
-            # 压缩成功后删除原图（可选）
-            sudo rm "$img"
+            # 压缩一个删一个，节省磁盘空间
+            sudo rm -f "$img"
           done
+
+      # 8. 上传到 Release
       - name: Upload compressed image to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG }}
           name: Armbian OdroidN2 Debian CLI ${{ env.TAG }}
-          files: |
-            build/output/images/*.img.xz
+          files: build/output/images/*.img.xz
