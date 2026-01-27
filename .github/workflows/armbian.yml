@@ -63,7 +63,7 @@ jobs:
 
       - name: Clone Armbian build repo (main branch only)
         run: |
-          git clone --depth=1 --branch=main https://github.com/armbian/build.git
+          git clone --depth=1 --branch=v25.05 https://github.com/armbian/build.git
 
       - name: Build Armbian for Odroid N2 (Debian CLI)
         working-directory: build
@@ -83,3 +83,4 @@ jobs:
           name: Armbian OdroidN2 Debian CLI ${{ env.TAG }}
           files: |
             build/output/images/*
+
