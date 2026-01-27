@@ -63,7 +63,7 @@ jobs:
           set -e
           for img in *.img; do
             echo "Compressing $img ..."
-            xz -T0 -6 "$img"
+            xz --no-group --no-same-owner -T0 -6 "$img"
           done
 
       - name: Upload compressed image to GitHub Release
