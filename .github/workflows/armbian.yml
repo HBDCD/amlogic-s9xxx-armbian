@@ -37,7 +37,6 @@ jobs:
           echo "Orphan tag cleanup finished."
 
       - name: Set build date tag
-        id: tag
         run: |
           TAG=$(date +%Y%m%d)
           echo "TAG=$TAG" >> $GITHUB_ENV
@@ -76,11 +75,20 @@ jobs:
             BUILD_DESKTOP=no \
             KERNEL_CONFIGURE=no
 
-      - name: Upload image to GitHub Release
+      # ===== 仅压缩镜像，不生成校验 =====
+      - name: Compress image
+        working-directory: build/output/images
+        run: |
+          set -e
+          for img in *.img; do
+            echo "Compressing $img ..."
+            xz -T0 -6 "$img"
+          done
+
+      - name: Upload compressed image to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG }}
           name: Armbian OdroidN2 Debian CLI ${{ env.TAG }}
           files: |
-            build/output/images/*
-
+            build/output/images/*.img.xz
