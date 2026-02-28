@@ -63,7 +63,7 @@ jobs:
           sudo ./compile.sh \
             BOARD=odroidn2 \
             BRANCH=current \
-            RELEASE=noble \
+            RELEASE=bookworm \
             BUILD_MINIMAL=no \
             BUILD_DESKTOP=no \
             KERNEL_CONFIGURE=no
@@ -89,5 +89,6 @@ jobs:
           tag_name: ${{ env.TAG }}
           name: Armbian OdroidN2 Debian CLI ${{ env.TAG }}
           files: build/output/images/*.img.xz
+
 
 
