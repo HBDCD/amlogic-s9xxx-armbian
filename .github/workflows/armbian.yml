@@ -54,7 +54,7 @@ jobs:
       # 5. 克隆 Armbian 源码
       - name: Clone Armbian build repo
         run: |
-          git clone --depth=1 --branch=v25.08 https://github.com/armbian/build.git
+          git clone --depth=1 --branch=v25.05 https://github.com/armbian/build.git
 
       # 6. 执行编译 (Odroid N2)
       - name: Build Armbian for Odroid N2 (Debian CLI)
@@ -89,6 +89,7 @@ jobs:
           tag_name: ${{ env.TAG }}
           name: Armbian OdroidN2 Debian CLI ${{ env.TAG }}
           files: build/output/images/*.img.xz
+
 
 
 
